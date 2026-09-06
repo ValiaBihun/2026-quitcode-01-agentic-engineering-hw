@@ -1,0 +1,12 @@
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--p-spacing-fluid-sm);
+  flex: 1 1 auto;
+  min-width: 220px;
+}
+
+.controls > :first-child {
+  flex: 1 1 auto;
+  min-width: 120px;
+}

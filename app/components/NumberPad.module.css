@@ -1,0 +1,8 @@
+.pad {
+  display: flex;
+  gap: var(--p-spacing-fluid-xs);
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  max-width: 360px;
+}

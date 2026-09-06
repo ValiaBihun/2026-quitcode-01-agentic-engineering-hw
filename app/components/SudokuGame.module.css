@@ -1,0 +1,38 @@
+.game {
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-spacing-fluid-md);
+  align-items: center;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--p-spacing-fluid-sm);
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 360px;
+}
+
+.boardStage {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+}
+
+.blurredBoard {
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+.startOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--p-color-surface);
+  border-radius: var(--p-radius-sm);
+}

@@ -1,0 +1,21 @@
+@import "@porsche-design-system/components-react/index.css";
+
+/* Prevents a flash of unstyled content while PDS custom elements upgrade. */
+:not(:defined, [data-ssr]) {
+  visibility: hidden;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--p-color-canvas);
+  color: var(--p-color-primary);
+}
+
+* {
+  box-sizing: border-box;
+}
