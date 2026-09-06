@@ -1,0 +1,7 @@
+.actions {
+  display: flex;
+  gap: var(--p-spacing-fluid-sm);
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 360px;
+}
