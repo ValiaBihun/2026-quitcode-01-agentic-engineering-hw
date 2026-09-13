@@ -6,6 +6,15 @@ import styles from "./SudokuCell.module.css";
 
 const DIGITS = Array.from({ length: SIZE }, (_, i) => i + 1);
 
+export type NavigateDirection = "up" | "down" | "left" | "right";
+
+const ARROW_KEY_DIRECTIONS: Record<string, NavigateDirection> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+};
+
 type SudokuCellProps = {
   row: number;
   col: number;
@@ -19,6 +28,7 @@ type SudokuCellProps = {
   onSelect: (row: number, col: number) => void;
   onDigit: (row: number, col: number, digit: number) => void;
   onClear: (row: number, col: number) => void;
+  onNavigate: (row: number, col: number, direction: NavigateDirection) => void;
 };
 
 export function SudokuCell({
@@ -34,8 +44,18 @@ export function SudokuCell({
   onSelect,
   onDigit,
   onClear,
+  onNavigate,
 }: SudokuCellProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const direction = ARROW_KEY_DIRECTIONS[event.key];
+    if (direction) {
+      // Navigation applies to given clues too — only entering/clearing a
+      // value is blocked for them.
+      event.preventDefault();
+      onNavigate(row, col, direction);
+      return;
+    }
+
     if (isGiven) return;
     if (event.key === "Backspace" || event.key === "Delete") {
       event.preventDefault();
@@ -66,6 +86,8 @@ export function SudokuCell({
       type="button"
       className={classNames}
       disabled={disabled}
+      data-row={row}
+      data-col={col}
       onClick={() => onSelect(row, col)}
       onFocus={() => onSelect(row, col)}
       onKeyDown={handleKeyDown}
