@@ -16,10 +16,8 @@ import { GameActions } from "./GameActions";
 import { GameStatus } from "./GameStatus";
 import { GameTimer } from "./GameTimer";
 import { NumberPad } from "./NumberPad";
+import { loadSavedGame, saveGame, type Notes, type Phase, type SavedGame } from "@/lib/storage";
 import styles from "./SudokuGame.module.css";
-
-type Phase = "idle" | "playing" | "paused";
-type Notes = number[][][];
 
 type GameState = {
   difficulty: Difficulty;
@@ -33,6 +31,7 @@ type GameState = {
 
 type GameAction =
   | { type: "NEW_GAME"; difficulty?: Difficulty }
+  | { type: "RESTORE"; game: SavedGame }
   | { type: "START" }
   | { type: "TOGGLE_PAUSE" }
   | { type: "TICK" }
@@ -75,6 +74,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         phase: "idle",
       };
     }
+    case "RESTORE":
+      return { ...action.game };
     case "START":
       return state.phase === "idle" ? { ...state, phase: "playing" } : state;
     case "TOGGLE_PAUSE": {
@@ -152,8 +153,16 @@ export function SudokuGame() {
   // Puzzle generation uses Math.random() and must only ever run on the
   // client — running it during server rendering of this client component
   // would produce different output on hydration and trigger a mismatch.
+  // Restoring from localStorage is equally client-only, so it lives in the
+  // same effect: whichever applies, this is the one place initial state
+  // comes from after mount.
   useEffect(() => {
-    dispatch({ type: "NEW_GAME" });
+    const saved = loadSavedGame();
+    if (saved) {
+      dispatch({ type: "RESTORE", game: saved });
+    } else {
+      dispatch({ type: "NEW_GAME" });
+    }
   }, []);
 
   const conflicts = useMemo(
@@ -187,6 +196,22 @@ export function SudokuGame() {
     const id = setInterval(() => dispatch({ type: "TICK" }), 1000);
     return () => clearInterval(id);
   }, [state.phase, isWon]);
+
+  // Persists the whole game to localStorage after every change (new puzzle,
+  // digit entry, pause/resume, each timer tick) so a reload resumes exactly
+  // where the player left off, instead of losing progress.
+  useEffect(() => {
+    if (!state.values || !state.givensMask || !state.notes || !state.solution) return;
+    saveGame({
+      difficulty: state.difficulty,
+      solution: state.solution,
+      givensMask: state.givensMask,
+      values: state.values,
+      notes: state.notes,
+      elapsedSeconds: state.elapsedSeconds,
+      phase: state.phase,
+    });
+  }, [state]);
 
   function startNewGame(difficulty?: Difficulty) {
     dispatch({ type: "NEW_GAME", difficulty });
