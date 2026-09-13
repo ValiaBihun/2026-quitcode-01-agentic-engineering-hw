@@ -16,6 +16,7 @@ import { GameActions } from "./GameActions";
 import { GameStatus } from "./GameStatus";
 import { GameTimer } from "./GameTimer";
 import { NumberPad } from "./NumberPad";
+import { ConfirmNewGameModal } from "./ConfirmNewGameModal";
 import { loadSavedGame, saveGame, type Notes, type Phase, type SavedGame } from "@/lib/storage";
 import styles from "./SudokuGame.module.css";
 
@@ -149,6 +150,10 @@ export function SudokuGame() {
   });
   const [selectedCell, setSelectedCell] = useState<SelectedCell>(null);
   const [pencilMode, setPencilMode] = useState(false);
+  const [pendingNewGame, setPendingNewGame] = useState<{ difficulty?: Difficulty } | null>(
+    null,
+  );
+  const [difficultySelectResetToken, setDifficultySelectResetToken] = useState(0);
 
   // Puzzle generation uses Math.random() and must only ever run on the
   // client — running it during server rendering of this client component
@@ -233,6 +238,22 @@ export function SudokuGame() {
   function startNewGame(difficulty?: Difficulty) {
     dispatch({ type: "NEW_GAME", difficulty });
     setSelectedCell(null);
+    setPendingNewGame(null);
+  }
+
+  // Changing difficulty or hitting New Game mid-puzzle used to discard the
+  // game instantly and irreversibly (NEW_GAME also immediately overwrites
+  // the persisted save) — one stray click on a select could throw away real
+  // progress. Anything worth losing (started, not yet won) now goes through
+  // a confirmation modal instead of applying right away.
+  const hasActiveProgress = (state.phase === "playing" || state.phase === "paused") && !isWon;
+
+  function requestNewGame(difficulty?: Difficulty) {
+    if (hasActiveProgress) {
+      setPendingNewGame({ difficulty });
+    } else {
+      startNewGame(difficulty);
+    }
   }
 
   function handleCellDigit(row: number, col: number, digit: number) {
@@ -268,8 +289,9 @@ export function SudokuGame() {
         <GameControls
           difficulty={state.difficulty}
           difficultyDisabled={state.phase === "paused"}
-          onDifficultyChange={(difficulty) => startNewGame(difficulty)}
-          onNewGame={() => startNewGame()}
+          resetToken={difficultySelectResetToken}
+          onDifficultyChange={(difficulty) => requestNewGame(difficulty)}
+          onNewGame={() => requestNewGame()}
         />
         <GameTimer seconds={Math.floor(state.elapsedMs / 1000)} />
       </div>
@@ -330,6 +352,15 @@ export function SudokuGame() {
         }}
         onClear={() => {
           if (selectedCell) handleCellClear(selectedCell.row, selectedCell.col);
+        }}
+      />
+
+      <ConfirmNewGameModal
+        open={pendingNewGame !== null}
+        onConfirm={() => startNewGame(pendingNewGame?.difficulty)}
+        onCancel={() => {
+          setPendingNewGame(null);
+          setDifficultySelectResetToken((token) => token + 1);
         }}
       />
     </div>
