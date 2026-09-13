@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { PButton, PText } from "@porsche-design-system/components-react/ssr";
 import {
   computeConflicts,
@@ -154,6 +154,7 @@ export function SudokuGame() {
     null,
   );
   const [difficultySelectResetToken, setDifficultySelectResetToken] = useState(0);
+  const pauseButtonRef = useRef<HTMLElement>(null);
 
   // Puzzle generation uses Math.random() and must only ever run on the
   // client — running it during server rendering of this client component
@@ -218,6 +219,18 @@ export function SudokuGame() {
       if (deltaMs > 0) dispatch({ type: "TICK", deltaMs });
     };
   }, [state.phase, isWon]);
+
+  // The board's 36 cells (and the NumberPad) toggle `disabled` on pause and
+  // resume. Disabling a focused element blurs it straight to
+  // document.body with no way back, so a keyboard user could lose their
+  // place and land at the very top of the page. Explicitly moving focus to
+  // the Pause/Resume button — the one control that's never disabled by
+  // phase — keeps it somewhere sensible across both transitions.
+  useEffect(() => {
+    if (state.phase === "playing" || state.phase === "paused") {
+      pauseButtonRef.current?.focus();
+    }
+  }, [state.phase]);
 
   // Persists the whole game to localStorage after every change (new puzzle,
   // digit entry, pause/resume, each timer tick) so a reload resumes exactly
@@ -298,6 +311,7 @@ export function SudokuGame() {
 
       {state.phase !== "idle" && !isWon && (
         <GameActions
+          ref={pauseButtonRef}
           isPaused={state.phase === "paused"}
           onTogglePause={() => dispatch({ type: "TOGGLE_PAUSE" })}
           pencilMode={pencilMode}
