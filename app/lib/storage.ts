@@ -10,7 +10,7 @@ export type SavedGame = {
   givensMask: boolean[][];
   values: Board;
   notes: Notes;
-  elapsedSeconds: number;
+  elapsedMs: number;
   phase: Phase;
 };
 
@@ -33,7 +33,7 @@ function isValidSavedGame(value: unknown): value is SavedGame {
     isGridWithSize(game.givensMask, SIZE) &&
     isGridWithSize(game.values, SIZE) &&
     isGridWithSize(game.notes, SIZE) &&
-    typeof game.elapsedSeconds === "number" &&
+    typeof game.elapsedMs === "number" &&
     (game.phase === "idle" || game.phase === "playing" || game.phase === "paused")
   );
 }

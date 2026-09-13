@@ -25,7 +25,7 @@ type GameState = {
   givensMask: boolean[][] | null;
   values: Board | null;
   notes: Notes | null;
-  elapsedSeconds: number;
+  elapsedMs: number;
   phase: Phase;
 };
 
@@ -34,7 +34,7 @@ type GameAction =
   | { type: "RESTORE"; game: SavedGame }
   | { type: "START" }
   | { type: "TOGGLE_PAUSE" }
-  | { type: "TICK" }
+  | { type: "TICK"; deltaMs: number }
   | {
       type: "INPUT_DIGIT";
       row: number;
@@ -70,7 +70,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         givensMask,
         values: puzzle,
         notes: createEmptyNotes(),
-        elapsedSeconds: 0,
+        elapsedMs: 0,
         phase: "idle",
       };
     }
@@ -84,7 +84,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return state;
     }
     case "TICK":
-      return { ...state, elapsedSeconds: state.elapsedSeconds + 1 };
+      return { ...state, elapsedMs: state.elapsedMs + action.deltaMs };
     case "INPUT_DIGIT": {
       if (!state.values || !state.givensMask || !state.notes) return state;
       if (state.givensMask[action.row][action.col]) return state;
@@ -144,7 +144,7 @@ export function SudokuGame() {
     givensMask: null,
     values: null,
     notes: null,
-    elapsedSeconds: 0,
+    elapsedMs: 0,
     phase: "idle",
   });
   const [selectedCell, setSelectedCell] = useState<SelectedCell>(null);
@@ -189,12 +189,29 @@ export function SudokuGame() {
     [state.values],
   );
 
-  // Ticks once a second while actively playing; stops (and freezes the
-  // display) on pause and on win.
+  // Advances the timer by the real wall-clock delta since the last flush,
+  // not by counting fixed "1 tick = 1 second" intervals — a backgrounded
+  // tab throttles setInterval (Chrome can delay it to once a minute or
+  // more), which would otherwise make the displayed time fall behind. On
+  // whatever stops ticking (pause, a win, or unmount), the cleanup flushes
+  // the exact remaining fraction of a second instead of discarding it.
   useEffect(() => {
     if (state.phase !== "playing" || isWon) return;
-    const id = setInterval(() => dispatch({ type: "TICK" }), 1000);
-    return () => clearInterval(id);
+
+    let lastFlushAt = Date.now();
+
+    const id = setInterval(() => {
+      const now = Date.now();
+      dispatch({ type: "TICK", deltaMs: now - lastFlushAt });
+      lastFlushAt = now;
+    }, 1000);
+
+    return () => {
+      clearInterval(id);
+      const now = Date.now();
+      const deltaMs = now - lastFlushAt;
+      if (deltaMs > 0) dispatch({ type: "TICK", deltaMs });
+    };
   }, [state.phase, isWon]);
 
   // Persists the whole game to localStorage after every change (new puzzle,
@@ -208,7 +225,7 @@ export function SudokuGame() {
       givensMask: state.givensMask,
       values: state.values,
       notes: state.notes,
-      elapsedSeconds: state.elapsedSeconds,
+      elapsedMs: state.elapsedMs,
       phase: state.phase,
     });
   }, [state]);
@@ -254,7 +271,7 @@ export function SudokuGame() {
           onDifficultyChange={(difficulty) => startNewGame(difficulty)}
           onNewGame={() => startNewGame()}
         />
-        <GameTimer seconds={state.elapsedSeconds} />
+        <GameTimer seconds={Math.floor(state.elapsedMs / 1000)} />
       </div>
 
       {state.phase !== "idle" && !isWon && (
