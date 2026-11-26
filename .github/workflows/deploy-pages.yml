@@ -33,6 +33,12 @@ jobs:
         working-directory: app
         run: npm ci
 
+      # A red test stops the deploy: a regression in the timer, the reducer or
+      # save validation never reaches GitHub Pages.
+      - name: Run tests
+        working-directory: app
+        run: npm test
+
       - name: Build static export
         working-directory: app
         run: npm run build
