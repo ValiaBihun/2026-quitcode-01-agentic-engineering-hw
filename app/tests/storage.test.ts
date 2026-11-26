@@ -1,17 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generatePuzzle, SIZE } from "../lib/sudoku";
+import { generatePuzzle, type GridSize } from "../lib/sudoku";
 import { isValidSavedGame, parseSavedGame, type SavedGame } from "../lib/storage";
 
-function validGame(): SavedGame {
-  const { solution, puzzle, givensMask } = generatePuzzle("medium");
+function validGame(size: GridSize = 6): SavedGame {
+  const { solution, puzzle, givensMask } = generatePuzzle("medium", size);
   return {
     difficulty: "medium",
     solution,
     givensMask,
     values: puzzle,
-    notes: Array.from({ length: SIZE }, () =>
-      Array.from({ length: SIZE }, () => [] as number[]),
+    notes: Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [] as number[]),
     ),
     elapsedMs: 12345,
     phase: "playing",
@@ -22,6 +22,39 @@ test("accepts a freshly generated game and round-trips through JSON", () => {
   const game = validGame();
   assert.equal(isValidSavedGame(game), true);
   assert.deepEqual(parseSavedGame(JSON.stringify(game)), game);
+});
+
+test("accepts a 9x9 game and round-trips it", () => {
+  const game = validGame(9);
+  assert.equal(isValidSavedGame(game), true);
+  assert.deepEqual(parseSavedGame(JSON.stringify(game)), game);
+});
+
+test("rejects grids of mixed size (9x9 solution with 6x6 values)", () => {
+  const game = validGame(9);
+  game.values = validGame(6).values;
+  assert.equal(isValidSavedGame(game), false);
+});
+
+test("rejects unsupported sizes (4x4, 8x8)", () => {
+  for (const size of [4, 8]) {
+    const grid = Array.from({ length: size }, () => Array(size).fill(1));
+    const game = { ...validGame(6), solution: grid, values: grid };
+    assert.equal(isValidSavedGame(game), false, String(size));
+  }
+});
+
+test("digit 9 is valid on 9x9 but out of range on 6x6", () => {
+  const nine = validGame(9);
+  const r = nine.givensMask.findIndex((row) => row.some((g) => !g));
+  const c = nine.givensMask[r].findIndex((g) => !g);
+  nine.values[r][c] = 9;
+  assert.equal(isValidSavedGame(nine), true);
+  const six = validGame(6);
+  const r6 = six.givensMask.findIndex((row) => row.some((g) => !g));
+  const c6 = six.givensMask[r6].findIndex((g) => !g);
+  six.values[r6][c6] = 9;
+  assert.equal(isValidSavedGame(six), false);
 });
 
 test("rejects missing or malformed JSON", () => {
@@ -58,7 +91,7 @@ const corruptions: Array<[string, (g: Loose) => void]> = [
     "given cell contradicts solution",
     (g) => {
       const [r, c] = firstGiven(g as SavedGame);
-      g.values[r][c] = (g.solution[r][c] % SIZE) + 1;
+      g.values[r][c] = (g.solution[r][c] % g.solution.length) + 1;
     },
   ],
   [

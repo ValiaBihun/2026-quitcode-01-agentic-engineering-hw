@@ -1,14 +1,16 @@
 "use client";
 
 import { PInlineNotification } from "@porsche-design-system/components-react/ssr";
-import { SIZE } from "@/lib/sudoku";
 
 type GameStatusProps = {
   isWon: boolean;
   filledCount: number;
+  size: number;
+  /** One-line puzzle rating from the logical solver, e.g. "Solvable with naked singles". */
+  rating: string;
 };
 
-export function GameStatus({ isWon, filledCount }: GameStatusProps) {
+export function GameStatus({ isWon, filledCount, size, rating }: GameStatusProps) {
   return isWon ? (
     <PInlineNotification
       heading="You solved it!"
@@ -19,7 +21,7 @@ export function GameStatus({ isWon, filledCount }: GameStatusProps) {
   ) : (
     <PInlineNotification
       heading="In progress"
-      description={`${filledCount} of ${SIZE * SIZE} cells filled.`}
+      description={`${filledCount} of ${size * size} cells filled. ${rating}`}
       state="info"
       dismissButton={false}
     />

@@ -6,12 +6,13 @@ import {
   PSelectOption,
 } from "@porsche-design-system/components-react/ssr";
 import type { SelectChangeEventDetail } from "@porsche-design-system/components-react/ssr";
-import type { Difficulty } from "@/lib/sudoku";
-import { DIFFICULTIES } from "@/lib/sudoku";
+import type { Difficulty, GridSize } from "@/lib/sudoku";
+import { DIFFICULTIES, GRID_SIZES } from "@/lib/sudoku";
 import styles from "./GameControls.module.css";
 
 type GameControlsProps = {
   difficulty: Difficulty;
+  size: GridSize;
   difficultyDisabled?: boolean;
   /**
    * Bumped whenever a pending difficulty change is cancelled. PSelect is a
@@ -23,14 +24,17 @@ type GameControlsProps = {
    */
   resetToken?: number;
   onDifficultyChange: (difficulty: Difficulty) => void;
+  onSizeChange: (size: GridSize) => void;
   onNewGame: () => void;
 };
 
 export function GameControls({
   difficulty,
+  size,
   difficultyDisabled = false,
   resetToken,
   onDifficultyChange,
+  onSizeChange,
   onNewGame,
 }: GameControlsProps) {
   function handleDifficultyChange(event: CustomEvent<SelectChangeEventDetail>) {
@@ -40,8 +44,27 @@ export function GameControls({
     }
   }
 
+  function handleSizeChange(event: CustomEvent<SelectChangeEventDetail>) {
+    const value = Number(event.detail.value);
+    if (value === 6 || value === 9) onSizeChange(value);
+  }
+
   return (
     <div className={styles.controls}>
+      <PSelect
+        key={`size-${resetToken}`}
+        name="size"
+        label="Grid"
+        value={String(size)}
+        disabled={difficultyDisabled}
+        onChange={handleSizeChange}
+      >
+        {GRID_SIZES.map((option) => (
+          <PSelectOption key={option} value={String(option)}>
+            {`${option}×${option}`}
+          </PSelectOption>
+        ))}
+      </PSelect>
       <PSelect
         key={resetToken}
         name="difficulty"

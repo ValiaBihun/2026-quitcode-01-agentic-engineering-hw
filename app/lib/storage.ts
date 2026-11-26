@@ -1,5 +1,5 @@
 import type { Board, Difficulty } from "./sudoku";
-import { BOX_COLS, BOX_ROWS, DIFFICULTIES, SIZE } from "./sudoku";
+import { DIFFICULTIES, gridSpec, isGridSize, type GridSize } from "./sudoku";
 
 export type Phase = "idle" | "playing" | "paused";
 export type Notes = number[][][];
@@ -24,8 +24,8 @@ function isGridWithSize(value: unknown, size: number): value is unknown[][] {
   );
 }
 
-function isDigit(value: unknown, min: number): value is number {
-  return Number.isInteger(value) && (value as number) >= min && (value as number) <= SIZE;
+function isDigit(value: unknown, min: number, size: GridSize): value is number {
+  return Number.isInteger(value) && (value as number) >= min && (value as number) <= size;
 }
 
 function everyCell(grid: unknown[][], check: (cell: unknown) => boolean): boolean {
@@ -33,32 +33,33 @@ function everyCell(grid: unknown[][], check: (cell: unknown) => boolean): boolea
 }
 
 // A completed grid is a valid Sudoku solution only if every row, column and
-// box holds each of 1..SIZE exactly once.
-function isCompleteSolution(grid: number[][]): boolean {
+// box holds each of 1..size exactly once.
+function isCompleteSolution(grid: number[][], size: GridSize): boolean {
+  const { boxRows, boxCols } = gridSpec(size);
   const groups: number[][] = [];
-  for (let i = 0; i < SIZE; i++) {
+  for (let i = 0; i < size; i++) {
     groups.push(grid[i]);
     groups.push(grid.map((row) => row[i]));
   }
-  for (let r = 0; r < SIZE; r += BOX_ROWS) {
-    for (let c = 0; c < SIZE; c += BOX_COLS) {
+  for (let r = 0; r < size; r += boxRows) {
+    for (let c = 0; c < size; c += boxCols) {
       const box: number[] = [];
-      for (let dr = 0; dr < BOX_ROWS; dr++) {
-        for (let dc = 0; dc < BOX_COLS; dc++) box.push(grid[r + dr][c + dc]);
+      for (let dr = 0; dr < boxRows; dr++) {
+        for (let dc = 0; dc < boxCols; dc++) box.push(grid[r + dr][c + dc]);
       }
       groups.push(box);
     }
   }
-  return groups.every((group) => new Set(group).size === SIZE);
+  return groups.every((group) => new Set(group).size === size);
 }
 
-function areValidNotes(notes: unknown[][]): boolean {
+function areValidNotes(notes: unknown[][], size: GridSize): boolean {
   return everyCell(
     notes,
     (cell) =>
       Array.isArray(cell) &&
-      cell.length <= SIZE &&
-      cell.every((n) => isDigit(n, 1)) &&
+      cell.length <= size &&
+      cell.every((n) => isDigit(n, 1, size)) &&
       new Set(cell).size === cell.length,
   );
 }
@@ -84,23 +85,28 @@ export function isValidSavedGame(value: unknown): value is SavedGame {
     return false;
   }
 
+  // The grid size is not stored separately: it is the solution's length, and
+  // every other grid must match it. Saves from before 9x9 existed are 6x6
+  // and load unchanged.
+  if (!Array.isArray(game.solution) || !isGridSize(game.solution.length)) return false;
+  const size: GridSize = game.solution.length;
   if (
-    !isGridWithSize(game.solution, SIZE) ||
-    !isGridWithSize(game.givensMask, SIZE) ||
-    !isGridWithSize(game.values, SIZE) ||
-    !isGridWithSize(game.notes, SIZE)
+    !isGridWithSize(game.solution, size) ||
+    !isGridWithSize(game.givensMask, size) ||
+    !isGridWithSize(game.values, size) ||
+    !isGridWithSize(game.notes, size)
   ) {
     return false;
   }
-  if (!everyCell(game.solution, (c) => isDigit(c, 1))) return false;
-  if (!everyCell(game.values, (c) => isDigit(c, 0))) return false;
+  if (!everyCell(game.solution, (c) => isDigit(c, 1, size))) return false;
+  if (!everyCell(game.values, (c) => isDigit(c, 0, size))) return false;
   if (!everyCell(game.givensMask, (c) => typeof c === "boolean")) return false;
-  if (!areValidNotes(game.notes)) return false;
+  if (!areValidNotes(game.notes, size)) return false;
 
   const solution = game.solution as number[][];
   const values = game.values as number[][];
   const givensMask = game.givensMask as boolean[][];
-  if (!isCompleteSolution(solution)) return false;
+  if (!isCompleteSolution(solution, size)) return false;
 
   // Given cells are immutable: they must be filled and match the solution.
   return givensMask.every((row, r) =>

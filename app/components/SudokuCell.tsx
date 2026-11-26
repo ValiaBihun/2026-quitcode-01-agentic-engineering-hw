@@ -1,10 +1,8 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
-import { BOX_COLS, BOX_ROWS, SIZE } from "@/lib/sudoku";
+import type { CSSProperties, KeyboardEvent } from "react";
+import type { GridSpec } from "@/lib/sudoku";
 import styles from "./SudokuCell.module.css";
-
-const DIGITS = Array.from({ length: SIZE }, (_, i) => i + 1);
 
 export type NavigateDirection = "up" | "down" | "left" | "right";
 
@@ -16,6 +14,7 @@ const ARROW_KEY_DIRECTIONS: Record<string, NavigateDirection> = {
 };
 
 type SudokuCellProps = {
+  spec: GridSpec;
   row: number;
   col: number;
   value: number;
@@ -32,6 +31,7 @@ type SudokuCellProps = {
 };
 
 export function SudokuCell({
+  spec,
   row,
   col,
   value,
@@ -46,6 +46,8 @@ export function SudokuCell({
   onClear,
   onNavigate,
 }: SudokuCellProps) {
+  const { size, boxRows, boxCols } = spec;
+
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const direction = ARROW_KEY_DIRECTIONS[event.key];
     if (direction) {
@@ -63,7 +65,7 @@ export function SudokuCell({
       return;
     }
     const digit = Number(event.key);
-    if (Number.isInteger(digit) && digit >= 1 && digit <= SIZE) {
+    if (Number.isInteger(digit) && digit >= 1 && digit <= size) {
       event.preventDefault();
       onDigit(row, col, digit);
     }
@@ -71,8 +73,9 @@ export function SudokuCell({
 
   const classNames = [
     styles.cell,
-    row % BOX_ROWS === BOX_ROWS - 1 && row !== SIZE - 1 ? styles.thickBottom : "",
-    col % BOX_COLS === BOX_COLS - 1 && col !== SIZE - 1 ? styles.thickRight : "",
+    size === 9 ? styles.compact : "",
+    row % boxRows === boxRows - 1 && row !== size - 1 ? styles.thickBottom : "",
+    col % boxCols === boxCols - 1 && col !== size - 1 ? styles.thickRight : "",
     isGiven ? styles.given : styles.editable,
     isHighlighted ? styles.highlighted : "",
     isConflicting ? styles.conflict : "",
@@ -80,6 +83,13 @@ export function SudokuCell({
   ]
     .filter(Boolean)
     .join(" ");
+
+  // Pencil marks mirror the box shape of a full grid: 3 across, 2 rows for
+  // 6x6 and 3 rows for 9x9.
+  const notesLayout: CSSProperties = {
+    gridTemplateColumns: `repeat(3, 1fr)`,
+    gridTemplateRows: `repeat(${size / 3}, 1fr)`,
+  };
 
   return (
     <button
@@ -98,8 +108,8 @@ export function SudokuCell({
       {value !== 0 ? (
         value
       ) : notes.length > 0 ? (
-        <span className={styles.notes}>
-          {DIGITS.map((digit) => (
+        <span className={styles.notes} style={notesLayout}>
+          {Array.from({ length: size }, (_, i) => i + 1).map((digit) => (
             <span key={digit} className={styles.noteSlot}>
               {notes.includes(digit) ? digit : ""}
             </span>

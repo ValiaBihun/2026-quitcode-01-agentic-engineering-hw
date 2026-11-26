@@ -1,12 +1,10 @@
 "use client";
 
 import { PButton } from "@porsche-design-system/components-react/ssr";
-import { SIZE } from "@/lib/sudoku";
 import styles from "./NumberPad.module.css";
 
-const DIGITS = Array.from({ length: SIZE }, (_, i) => i + 1);
-
 type NumberPadProps = {
+  size: number;
   disabled: boolean;
   onDigit: (digit: number) => void;
   onClear: () => void;
@@ -14,10 +12,11 @@ type NumberPadProps = {
 
 // Cells are plain buttons (not text inputs), so a physical keyboard isn't the
 // only way in — this gives touch/mobile users a way to enter digits too.
-export function NumberPad({ disabled, onDigit, onClear }: NumberPadProps) {
+export function NumberPad({ size, disabled, onDigit, onClear }: NumberPadProps) {
+  const digits = Array.from({ length: size }, (_, i) => i + 1);
   return (
     <div className={styles.pad}>
-      {DIGITS.map((digit) => (
+      {digits.map((digit) => (
         <PButton
           key={digit}
           type="button"

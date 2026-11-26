@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { BOX_COLS, BOX_ROWS, SIZE, type Board } from "@/lib/sudoku";
+import { specOf, type Board } from "@/lib/sudoku";
 import { SudokuCell, type NavigateDirection } from "./SudokuCell";
 import styles from "./SudokuBoard.module.css";
 
@@ -38,6 +38,8 @@ export function SudokuBoard({
   onCellClear,
 }: SudokuBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
+  const spec = specOf(values);
+  const { size, boxRows, boxCols } = spec;
 
   // Tab alone previously covered movement between cells; arrow keys are the
   // conventional way to navigate a grid widget without stepping through
@@ -45,8 +47,8 @@ export function SudokuBoard({
   // than wrapping, to keep movement predictable.
   function handleNavigate(row: number, col: number, direction: NavigateDirection) {
     const [rowDelta, colDelta] = DIRECTION_DELTA[direction];
-    const targetRow = Math.min(SIZE - 1, Math.max(0, row + rowDelta));
-    const targetCol = Math.min(SIZE - 1, Math.max(0, col + colDelta));
+    const targetRow = Math.min(size - 1, Math.max(0, row + rowDelta));
+    const targetCol = Math.min(size - 1, Math.max(0, col + colDelta));
     const target = boardRef.current?.querySelector<HTMLButtonElement>(
       `[data-row="${targetRow}"][data-col="${targetCol}"]`,
     );
@@ -54,7 +56,13 @@ export function SudokuBoard({
   }
 
   return (
-    <div ref={boardRef} className={styles.board} role="grid" aria-label="Sudoku board">
+    <div
+      ref={boardRef}
+      className={styles.board}
+      style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+      role="grid"
+      aria-label={`Sudoku board, ${size} by ${size}`}
+    >
       {values.map((rowValues, row) =>
         rowValues.map((value, col) => {
           const isSelected =
@@ -64,12 +72,13 @@ export function SudokuBoard({
             selectedCell !== null &&
             (selectedCell.row === row ||
               selectedCell.col === col ||
-              (Math.floor(selectedCell.row / BOX_ROWS) === Math.floor(row / BOX_ROWS) &&
-                Math.floor(selectedCell.col / BOX_COLS) === Math.floor(col / BOX_COLS)));
+              (Math.floor(selectedCell.row / boxRows) === Math.floor(row / boxRows) &&
+                Math.floor(selectedCell.col / boxCols) === Math.floor(col / boxCols)));
 
           return (
             <SudokuCell
               key={`${row}-${col}`}
+              spec={spec}
               row={row}
               col={col}
               value={value}

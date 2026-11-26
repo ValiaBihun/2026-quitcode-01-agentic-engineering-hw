@@ -9,8 +9,10 @@ export default function Home() {
         Sudoku
       </PHeading>
       <PText>
-        Fill every row, column and 2x3 box with the digits 1–6. Given clues
-        can&apos;t be edited, and duplicate digits are highlighted.
+        Fill every row, column and box with each digit once: 1–6 on a 6×6 grid
+        with 2×3 boxes, or 1–9 on a classic 9×9. Given clues can&apos;t be
+        edited, duplicates are highlighted, and Hint explains why the next
+        digit is forced.
       </PText>
       <SudokuGame />
     </main>

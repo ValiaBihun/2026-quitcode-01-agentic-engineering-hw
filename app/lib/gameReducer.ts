@@ -1,4 +1,4 @@
-import { SIZE, type Board, type Difficulty, type generatePuzzle } from "./sudoku";
+import type { Board, Difficulty, generatePuzzle } from "./sudoku";
 import type { Notes, Phase, SavedGame } from "./storage";
 
 // All game-state transitions live here, outside the component, so they can be
@@ -39,9 +39,9 @@ export type GameAction =
   | { type: "CLEAR_CELL"; row: number; col: number }
   | { type: "REVEAL_CELL"; row: number; col: number };
 
-export function createEmptyNotes(): Notes {
-  return Array.from({ length: SIZE }, () =>
-    Array.from({ length: SIZE }, () => [] as number[]),
+export function createEmptyNotes(size: number): Notes {
+  return Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => [] as number[]),
   );
 }
 
@@ -62,7 +62,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         solution,
         givensMask,
         values: puzzle,
-        notes: createEmptyNotes(),
+        notes: createEmptyNotes(puzzle.length),
         elapsedMs: 0,
         phase: "idle",
       };

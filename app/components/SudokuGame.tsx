@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { PButton, PText } from "@porsche-design-system/components-react/ssr";
+import {
+  PButton,
+  PInlineNotification,
+  PText,
+} from "@porsche-design-system/components-react/ssr";
 import {
   computeConflicts,
   generatePuzzle,
   isBoardSolved,
   type Difficulty,
+  type GridSize,
 } from "@/lib/sudoku";
+import { solveLogically, TECHNIQUE_LABELS } from "@/lib/solver";
+import { planHint } from "@/lib/hint";
 import { SudokuBoard, type SelectedCell } from "./SudokuBoard";
 import { GameControls } from "./GameControls";
 import { GameActions } from "./GameActions";
@@ -23,13 +30,16 @@ import {
 } from "@/lib/gameReducer";
 import styles from "./SudokuGame.module.css";
 
+type NewGameOptions = { difficulty?: Difficulty; size?: GridSize };
+
 export function SudokuGame() {
   const [state, dispatch] = useReducer(gameReducer, INITIAL_GAME_STATE);
   const [selectedCell, setSelectedCell] = useState<SelectedCell>(null);
   const [pencilMode, setPencilMode] = useState(false);
-  const [pendingNewGame, setPendingNewGame] = useState<{ difficulty?: Difficulty } | null>(
-    null,
-  );
+  const [pendingNewGame, setPendingNewGame] = useState<NewGameOptions | null>(null);
+  // The latest hint's explanation. Not part of the persisted game: it
+  // describes one moment and is cleared by the next move.
+  const [hint, setHint] = useState<{ text: string; tone: "info" | "warning" } | null>(null);
   const [difficultySelectResetToken, setDifficultySelectResetToken] = useState(0);
   const pauseButtonRef = useRef<HTMLElement>(null);
 
@@ -64,6 +74,23 @@ export function SudokuGame() {
         : false,
     [state.values, state.solution],
   );
+
+  // Rates the current puzzle by the hardest technique the logical solver
+  // needs for it, using the givens only (the player's entries don't change
+  // how hard the puzzle is).
+  const rating = useMemo(() => {
+    if (!state.values || !state.givensMask) return "";
+    const givensOnly = state.values.map((row, r) =>
+      row.map((value, c) => (state.givensMask![r][c] ? value : 0)),
+    );
+    const result = solveLogically(givensOnly);
+    const used = result.techniques.map((t) => TECHNIQUE_LABELS[t]).join(", ");
+    return result.solved
+      ? `Solvable with ${used || "naked singles"}.`
+      : `Needs more than singles and pairs${used ? ` (gets stuck after ${used})` : ""}.`;
+    // Givens never change within a game, so the mask identifies the puzzle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.givensMask]);
 
   const filledCount = useMemo(
     () =>
@@ -129,15 +156,19 @@ export function SudokuGame() {
     });
   }, [state]);
 
-  function startNewGame(difficulty?: Difficulty) {
+  const size: GridSize = state.values?.length === 9 ? 9 : 6;
+
+  function startNewGame({ difficulty, size: nextSize }: NewGameOptions = {}) {
     const nextDifficulty = difficulty ?? state.difficulty;
+    const gridSize = nextSize ?? size;
     dispatch({
       type: "NEW_GAME",
       difficulty: nextDifficulty,
-      generated: generatePuzzle(nextDifficulty),
+      generated: generatePuzzle(nextDifficulty, gridSize),
     });
     setSelectedCell(null);
     setPendingNewGame(null);
+    setHint(null);
   }
 
   // Changing difficulty or hitting New Game mid-puzzle used to discard the
@@ -147,15 +178,32 @@ export function SudokuGame() {
   // a confirmation modal instead of applying right away.
   const hasActiveProgress = needsNewGameConfirmation(state.phase, isWon);
 
-  function requestNewGame(difficulty?: Difficulty) {
+  function requestNewGame(options: NewGameOptions = {}) {
     if (hasActiveProgress) {
-      setPendingNewGame({ difficulty });
+      setPendingNewGame(options);
     } else {
-      startNewGame(difficulty);
+      startNewGame(options);
     }
   }
 
+  function handleHint() {
+    if (!state.values || !state.solution) return;
+    const plan = planHint(state.values, state.solution, selectedCell);
+    if (!plan) return;
+    setSelectedCell({ row: plan.row, col: plan.col });
+    if (plan.kind === "wrong") {
+      setHint({ text: plan.text, tone: "warning" });
+      return;
+    }
+    // A logical step's digit always equals the solution's (the solver is
+    // sound, checked in tests/solver.test.ts), so revealing from the
+    // solution places exactly the deduced digit.
+    dispatch({ type: "REVEAL_CELL", row: plan.row, col: plan.col });
+    setHint({ text: plan.text, tone: "info" });
+  }
+
   function handleCellDigit(row: number, col: number, digit: number) {
+    setHint(null);
     dispatch({
       type: "INPUT_DIGIT",
       row,
@@ -166,6 +214,7 @@ export function SudokuGame() {
   }
 
   function handleCellClear(row: number, col: number) {
+    setHint(null);
     dispatch({ type: "CLEAR_CELL", row, col });
   }
 
@@ -173,12 +222,9 @@ export function SudokuGame() {
     return <PText>Generating puzzle…</PText>;
   }
 
-  const canHint =
-    state.phase === "playing" &&
-    !isWon &&
-    selectedCell !== null &&
-    !state.givensMask[selectedCell.row][selectedCell.col] &&
-    state.values[selectedCell.row][selectedCell.col] === 0;
+  // The hint finds its own cell now (the next logical step), so it no
+  // longer needs an empty cell to be selected first.
+  const canHint = state.phase === "playing" && !isWon;
 
   const boardDisabled = state.phase !== "playing" || isWon;
 
@@ -187,9 +233,11 @@ export function SudokuGame() {
       <div className={styles.topRow}>
         <GameControls
           difficulty={state.difficulty}
+          size={size}
           difficultyDisabled={state.phase === "paused"}
           resetToken={difficultySelectResetToken}
-          onDifficultyChange={(difficulty) => requestNewGame(difficulty)}
+          onDifficultyChange={(difficulty) => requestNewGame({ difficulty })}
+          onSizeChange={(nextSize) => requestNewGame({ size: nextSize })}
           onNewGame={() => requestNewGame()}
         />
         <GameTimer seconds={Math.floor(state.elapsedMs / 1000)} />
@@ -204,19 +252,21 @@ export function SudokuGame() {
           onTogglePencil={() => setPencilMode((value) => !value)}
           pencilDisabled={state.phase === "paused"}
           canHint={canHint}
-          onHint={() => {
-            if (selectedCell) {
-              dispatch({
-                type: "REVEAL_CELL",
-                row: selectedCell.row,
-                col: selectedCell.col,
-              });
-            }
-          }}
+          onHint={handleHint}
         />
       )}
 
-      <GameStatus isWon={isWon} filledCount={filledCount} />
+      <GameStatus isWon={isWon} filledCount={filledCount} size={size} rating={rating} />
+
+      {hint && !isWon && (
+        <PInlineNotification
+          heading={hint.tone === "warning" ? "Check this cell" : "Hint"}
+          description={hint.text}
+          state={hint.tone}
+          dismissButton
+          onDismiss={() => setHint(null)}
+        />
+      )}
 
       <div className={styles.boardStage}>
         <div className={state.phase === "paused" ? styles.blurredBoard : undefined}>
@@ -246,6 +296,7 @@ export function SudokuGame() {
       </div>
 
       <NumberPad
+        size={size}
         disabled={boardDisabled || !selectedCell}
         onDigit={(digit) => {
           if (selectedCell) handleCellDigit(selectedCell.row, selectedCell.col, digit);
@@ -257,7 +308,7 @@ export function SudokuGame() {
 
       <ConfirmNewGameModal
         open={pendingNewGame !== null}
-        onConfirm={() => startNewGame(pendingNewGame?.difficulty)}
+        onConfirm={() => startNewGame(pendingNewGame ?? {})}
         onCancel={() => {
           setPendingNewGame(null);
           setDifficultySelectResetToken((token) => token + 1);

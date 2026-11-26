@@ -147,3 +147,10 @@ test("New Game asks for confirmation only when there is progress to lose", () =>
   assert.equal(needsNewGameConfirmation("idle", false), false);
   assert.equal(needsNewGameConfirmation("playing", true), false);
 });
+
+test("NEW_GAME on a 9x9 puzzle sizes the notes grid 9x9", () => {
+  const big = generatePuzzle("easy", 9);
+  const state = gameReducer(INITIAL_GAME_STATE, { type: "NEW_GAME", difficulty: "easy", generated: big });
+  assert.equal(state.notes!.length, 9);
+  assert.ok(state.notes!.every((row) => row.length === 9));
+});
