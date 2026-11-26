@@ -138,13 +138,33 @@ function carvePuzzle(solution: Board, targetGivens: number): Board {
   return puzzle;
 }
 
+const MAX_CARVE_ATTEMPTS = 20;
+
+function countGivens(puzzle: Board): number {
+  return puzzle.reduce((count, row) => count + row.filter((value) => value !== 0).length, 0);
+}
+
 export function generatePuzzle(difficulty: Difficulty): {
   solution: Board;
   puzzle: Board;
   givensMask: boolean[][];
 } {
-  const solution = generateSolvedBoard();
-  const puzzle = carvePuzzle(solution, DIFFICULTY_GIVENS[difficulty]);
+  const target = DIFFICULTY_GIVENS[difficulty];
+  // Greedy carving can get stuck above the target: occasionally (~1 in 5000
+  // "hard" puzzles, found by tests/sudoku.test.ts) no remaining cell can be
+  // removed without losing uniqueness, leaving 13 givens instead of 12. Retry
+  // with a fresh grid and removal order; a bounded loop keeps the worst case
+  // finite, and the closest result wins if every attempt falls short.
+  let solution = generateSolvedBoard();
+  let puzzle = carvePuzzle(solution, target);
+  for (let attempt = 1; attempt < MAX_CARVE_ATTEMPTS && countGivens(puzzle) > target; attempt++) {
+    const nextSolution = generateSolvedBoard();
+    const nextPuzzle = carvePuzzle(nextSolution, target);
+    if (countGivens(nextPuzzle) < countGivens(puzzle)) {
+      solution = nextSolution;
+      puzzle = nextPuzzle;
+    }
+  }
   const givensMask = puzzle.map((row) => row.map((value) => value !== 0));
   return { solution, puzzle, givensMask };
 }
